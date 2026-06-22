@@ -80,6 +80,7 @@ func HandleSSE(repo store.Repository) http.HandlerFunc {
 		w.Header().Set("Cache-Control", "no-cache")
 		w.Header().Set("Connection", "keep-alive")
 		w.WriteHeader(http.StatusOK)
+		flusher.Flush()
 
 		ch := hub.subscribe(endpointID)
 		defer hub.unsubscribe(endpointID, ch)

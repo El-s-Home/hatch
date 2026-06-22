@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/elfoundation/hatch/internal/store"
 	"github.com/go-chi/chi/v5"
@@ -127,6 +128,80 @@ func TestCaptureRecordsAllVerbs(t *testing.T) {
 			t.Errorf("%s: wrong method %s", m, reqCaptured.Method)
 		}
 	}
+}
+
+func TestSSEStreamReceivesEventOnCapture(t *testing.T) {
+	repo := newFakeRepo()
+	srv := httptest.NewServer(testRouter(repo))
+	defer srv.Close()
+
+	// Use separate clients with separate transports to avoid
+	// connection-pool contention with the long-lived SSE connection.
+	sseClient := &http.Client{
+		Transport: &http.Transport{DisableKeepAlives: true},
+	}
+	captureClient := &http.Client{
+		Transport: &http.Transport{DisableKeepAlives: true},
+	}
+
+	// Subscribe to SSE with a cancellable context.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sseReq, err := http.NewRequestWithContext(ctx, http.MethodGet, srv.URL+"/e/ep/events", nil)
+	if err != nil {
+		t.Fatalf("SSE request create failed: %v", err)
+	}
+	sseResp, err := sseClient.Do(sseReq)
+	if err != nil {
+		t.Fatalf("SSE GET failed: %v", err)
+	}
+	defer sseResp.Body.Close()
+
+	if sseResp.StatusCode != http.StatusOK {
+		t.Fatalf("SSE returned %d", sseResp.StatusCode)
+	}
+	ct := sseResp.Header.Get("Content-Type")
+	if !strings.HasPrefix(ct, "text/event-stream") {
+		t.Fatalf("SSE Content-Type is %q, expected text/event-stream", ct)
+	}
+
+	// Read SSE body in a goroutine; capture in main goroutine.
+	bodyCh := make(chan string, 1)
+	go func() {
+		buf := make([]byte, 4096)
+		n, _ := sseResp.Body.Read(buf)
+		bodyCh <- string(buf[:n])
+	}()
+
+	// Small sleep to let the SSE subscription register.
+	time.Sleep(10 * time.Millisecond)
+
+	// Capture a request on the same server.
+	captureResp, err := captureClient.Post(srv.URL+"/ep", "application/json", strings.NewReader(`{"msg":"hello"}`))
+	if err != nil {
+		t.Fatalf("capture POST failed: %v", err)
+	}
+	captureResp.Body.Close()
+	if captureResp.StatusCode != http.StatusOK {
+		t.Fatalf("capture returned %d", captureResp.StatusCode)
+	}
+
+	// Wait for the SSE event with a timeout.
+	select {
+	case body := <-bodyCh:
+		if !strings.Contains(body, "data:") {
+			t.Fatalf("SSE stream missing 'data:' prefix: %q", body)
+		}
+		if !strings.Contains(body, "\"method\":\"POST\"") {
+			t.Fatalf("SSE stream missing POST method: %q", body)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for SSE event")
+	}
+
+	// Cancel context to close the SSE connection.
+	cancel()
 }
 
 func TestCaptureReturnsJSON200(t *testing.T) {
