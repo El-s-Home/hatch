@@ -2,7 +2,10 @@ CREATE TABLE IF NOT EXISTS endpoints (
     id         TEXT NOT NULL PRIMARY KEY,
     url        TEXT NOT NULL UNIQUE,
     created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
+    updated_at TEXT NOT NULL,
+    mock_status INTEGER,
+    mock_headers TEXT,
+    mock_body BLOB
 );
 CREATE TABLE IF NOT EXISTS requests (
     id          TEXT NOT NULL PRIMARY KEY,

@@ -4,36 +4,57 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
+
+	"github.com/elfoundation/hatch/internal/handler"
+	"github.com/elfoundation/hatch/internal/store"
+	"github.com/go-chi/chi/v5"
 )
 
-func TestHealthz(t *testing.T) {
+func TestHealthzViaRouter(t *testing.T) {
+	repo, err := store.Open(":memory:")
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer repo.Close()
+
+	r := chi.NewRouter()
+	h := handler.New(repo)
+	h.RegisterRoutes(r)
+
 	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
 
-	healthz(w, req)
-
-	resp := w.Result()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("expected 200 OK, got %d", resp.StatusCode)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK, got %d", w.Code)
 	}
-
-	body, err := io.ReadAll(resp.Body)
-	resp.Body.Close()
-	if err != nil {
-		t.Fatalf("failed to read response body: %v", err)
-	}
-
+	body, _ := io.ReadAll(w.Result().Body)
+	w.Result().Body.Close()
 	got := strings.TrimSpace(string(body))
 	if got != "ok" {
-		t.Fatalf("expected body 'ok', got '%s'", got)
+		t.Fatalf("expected body 'ok', got %q", got)
 	}
 }
 
 func TestHealthzSmoke(t *testing.T) {
-	// Smoke test: boot the server on a random port, hit /healthz, verify 200 + "ok".
-	srv := httptest.NewServer(http.HandlerFunc(healthz))
+	// Smoke: boot server on random port, hit /healthz.
+	// Use :memory: store so no filesystem dependency.
+	os.Setenv("HATCH_DB_PATH", ":memory:")
+
+	repo, err := store.Open(":memory:")
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer repo.Close()
+
+	r := chi.NewRouter()
+	h := handler.New(repo)
+	h.RegisterRoutes(r)
+
+	srv := httptest.NewServer(r)
 	defer srv.Close()
 
 	resp, err := http.Get(srv.URL + "/healthz")
@@ -45,14 +66,12 @@ func TestHealthzSmoke(t *testing.T) {
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("expected 200 OK, got %d", resp.StatusCode)
 	}
-
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatalf("failed to read response body: %v", err)
 	}
-
 	got := strings.TrimSpace(string(body))
 	if got != "ok" {
-		t.Fatalf("expected body 'ok', got '%s'", got)
+		t.Fatalf("expected body 'ok', got %q", got)
 	}
 }

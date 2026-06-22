@@ -20,11 +20,22 @@ type Request struct {
 	CreatedAt  string `json:"created_at"`
 }
 
+// MockConfig holds the mock response configuration for an endpoint.
+type MockConfig struct {
+	EndpointID string            `json:"endpoint_id"`
+	Status     int               `json:"status"`
+	Headers    map[string]string `json:"headers"`
+	Body       []byte            `json:"body"`
+}
+
 type Repository interface {
 	CreateEndpoint(ctx context.Context, url string) (*Endpoint, error)
 	GetEndpoint(ctx context.Context, id string) (*Endpoint, error)
 	AppendRequest(ctx context.Context, endpointID string, req *Request) error
+	GetRequest(ctx context.Context, id string) (*Request, error)
 	ListRequests(ctx context.Context, endpointID string, limit int) ([]*Request, error)
+	GetMock(ctx context.Context, endpointID string) (*MockConfig, error)
+	SetMock(ctx context.Context, mock *MockConfig) error
 	Close() error
 }
 

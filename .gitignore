@@ -19,3 +19,4 @@ go.work
 *.swo
 *~
 .DS_Store
+hatch
