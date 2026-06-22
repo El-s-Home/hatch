@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"io"
-	"log"
 	"net/http"
 	"strings"
 
@@ -15,7 +14,10 @@ type Handler struct{ Repo store.Repository }
 
 func New(repo store.Repository) *Handler { return &Handler{Repo: repo} }
 
-func (h *Handler) RegisterRoutes(mux *http.ServeMux) { mux.Handle("/{endpoint}", h) }
+func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
+	mux.Handle("/{endpoint}", h)
+	mux.Handle("/{endpoint}/", h)
+}
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	eid := extractID(r.URL.Path)
@@ -39,6 +41,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func extractID(p string) string {
 	t := strings.TrimLeft(p, "/")
-	if i := strings.Index(t, "/"); i >= 0 { return t[:i] }
+	if i := strings.IndexByte(t, '?'); i >= 0 { t = t[:i] }
+	if i := strings.IndexByte(t, '/'); i >= 0 { return t[:i] }
 	return t
 }

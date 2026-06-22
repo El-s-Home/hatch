@@ -16,9 +16,8 @@ func NewSQLiteRepo(db *sql.DB) (Repository, error) {
 }
 
 func (r *sqliteRepo) CreateEndpoint(ctx context.Context, url string) (*Endpoint, error) {
-	id := uuid.NewString()
 	now := utcNow()
-	e := &Endpoint{ID: id, URL: url, CreatedAt: now, UpdatedAt: now}
+	e := &Endpoint{ID: url, URL: url, CreatedAt: now, UpdatedAt: now}
 	_, err := r.db.ExecContext(ctx, `INSERT INTO endpoints (id, url, created_at, updated_at) VALUES (?, ?, ?, ?)`, e.ID, e.URL, e.CreatedAt, e.UpdatedAt)
 	if err != nil { return nil, fmt.Errorf("store: create endpoint: %w", err) }
 	return e, nil
