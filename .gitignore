@@ -8,16 +8,9 @@
 *.out
 go.work
 
-# Build artifacts
+# Build
 /bin
 /dist
-/hatch
-/hatch-*
-bin/
-*.db
-*.db-journal
-*.db-wal
-*.db-shm
 
 # IDE
 .idea/
@@ -26,3 +19,5 @@ bin/
 *.swo
 *~
 .DS_Store
+/hatch
+hatch.exe

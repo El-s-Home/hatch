@@ -1,8 +1,3 @@
-// Command hatch is the Hatch HTTP request inspector + mocker server.
-//
-// Hatch captures, inspects, and mocks HTTP requests. It ships as a single
-// static binary — one command on a VPS and your payloads never leave your
-// network.
 package main
 
 import (
@@ -10,6 +5,10 @@ import (
 	"log"
 	"net/http"
 	"os"
+
+	"github.com/elfoundation/hatch/internal/handler"
+	"github.com/elfoundation/hatch/internal/store"
+	"github.com/go-chi/chi/v5"
 )
 
 func main() {
@@ -17,20 +16,20 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
+	dbPath := os.Getenv("HATCH_DB_PATH")
+	repo, err := store.Open(dbPath)
+	if err != nil {
+		log.Fatalf("hatch: open store: %v", err)
+	}
+	defer repo.Close()
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /healthz", healthz)
+	h := handler.New(repo)
+	r := chi.NewRouter()
+	h.RegisterRoutes(r)
 
 	addr := fmt.Sprintf(":%s", port)
 	log.Printf("hatch starting on %s", addr)
-	if err := http.ListenAndServe(addr, mux); err != nil {
+	if err := http.ListenAndServe(addr, r); err != nil {
 		log.Fatalf("hatch server error: %v", err)
 	}
-}
-
-// healthz returns 200 OK with body "ok" for liveness probes.
-func healthz(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/plain")
-	w.WriteHeader(http.StatusOK)
-	fmt.Fprintln(w, "ok")
 }
