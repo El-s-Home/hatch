@@ -26,7 +26,7 @@ This ADR closes those gaps with concrete choices, named alternatives, and the ro
 | SQLite driver | `modernc.org/sqlite` (pure Go) | Keeps the "no CGO" promise that the static-binary distribution rests on. |
 | Templates | stdlib `html/template`, embedded with `//go:embed` | Auto-escaping by default, no template-engine dependency, no runtime parsing of the filesystem. |
 | Test framework | stdlib `testing` + `net/http/httptest` | No assertion library unless pain demands one. |
-| License | Apache-2.0 | Permissive, explicit patent grant, matches Go ecosystem norms. |
+| License | MIT (revised; was Apache-2.0) | Permissive, lowest friction for small single-binary dev tools; CEO decision [ELF-141](https://github.com/elfoundation/hatch/issues/141). |
 | Config | Environment variables only (`PORT`, `HATCH_DB_PATH`, `HATCH_LISTEN`) | Twelve-factor. No YAML/JSON config files for v0.1. |
 | Logging | stdlib `log` to stdout, structured via `slog` (Go 1.21+) | No third-party logging library until we need log shipping. |
 | Process model | Single process, one port, in-process SSE hub | v0.1 is a self-hosted single-binary product. No workers, no sidecars. |
@@ -59,7 +59,11 @@ Pure Go. Translates SQLite's C source via `ccgo` at build time, so the produced 
 
 **Why not `testify` or `gocheck`?** No assertion library has yet earned its place. We will adopt one when the boilerplate of `if got != want { t.Errorf(...) }` becomes a real cost, not before.
 
-### License: Apache-2.0
+### License: MIT (revised 2026-06-23)
+
+**Superseded by CEO decision** — [ELF-141](https://github.com/elfoundation/hatch/issues/141) locked the OSS license at **MIT** ahead of the v0.1 public launch. The original Apache-2.0 reasoning is preserved below for history; the repo now ships under MIT (see [`LICENSE`](../../LICENSE)). MIT→Apache-2.0 remains a compatible, reversible upgrade if a corporate contributor raises patent concerns later.
+
+#### Original Apache-2.0 reasoning (superseded)
 
 Permissive. Explicit patent grant. Matches what the Go ecosystem uses (Kubernetes, Docker, the Go toolchain itself are permissive-licensed). Compatible with corporate adoption without legal-review friction.
 
@@ -79,7 +83,7 @@ Permissive. Explicit patent grant. Matches what the Go ecosystem uses (Kubernete
 - Chi is one more dependency to track. If a future Go stdlib release subsumes the middleware story, we have a small migration.
 - `modernc.org/sqlite` is slower than the C version on raw throughput benchmarks (~2–3× on simple SELECTs). For v0.1's workload (a self-hosted single-user product) this is invisible. We will measure before optimizing.
 - Stdlib `html/template` has no inheritance, no partials-with-arguments, and no "components." If template complexity grows, we will feel it. The mitigation is to keep the page count low (Capture page, Inspect page, Mock config page, error page).
-- Apache-2.0 is more verbose than MIT. Trivial cost; mentioned for completeness.
+- (Historical, pre-MIT switch:) Apache-2.0 is more verbose than MIT. Trivial cost; mentioned for completeness.
 
 ## Alternatives Considered
 
@@ -115,7 +119,7 @@ Permissive. Explicit patent grant. Matches what the Go ecosystem uses (Kubernete
 | `modernc.org/sqlite` | Swap to `mattn/go-sqlite3`. Add CGO to the Dockerfile. Update CI to install `gcc`. ~half a day, plus the Dockerfile/CI change. |
 | `html/template` | Adopt `templ` (or `jet`). Adds a code-generation step. ~1 day plus regen. |
 | stdlib `testing` | Adopt `testify`. Mechanical import swap. ~2 hours. |
-| Apache-2.0 | Relicense with contributor agreement. Not a code change, but a legal process. Not reversible by us alone. |
+| MIT (was Apache-2.0) | Relicense with contributor agreement. Not a code change, but a legal process. MIT→Apache-2.0 is a compatible upgrade if patent concerns arise. |
 | Env-only config | Adopt `viper` or `koanf`. ~1 day including flag plumbing. |
 
 The first five rollbacks are independent and can be done in any order. The license change is not ours to make unilaterally.

@@ -84,4 +84,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-Apache-2.0 — see [LICENSE](LICENSE).
+Hatch is released under the MIT License — see [LICENSE](LICENSE).
