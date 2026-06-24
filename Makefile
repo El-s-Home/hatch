@@ -14,10 +14,9 @@ test:
 lint:
 	golangci-lint run ./...
 
-## fmt: Format code with gofmt and goimports
+## fmt: Format code with gofmt
 fmt:
 	gofmt -s -w .
-	goimports -w .
 
 ## vet: Run go vet
 vet:
