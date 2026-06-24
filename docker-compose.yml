@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  hatch-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hatch-web
+    restart: unless-stopped
+    networks:
+      - hatch-network
+    # No ports exposed to host - nginx reverse proxies to container
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:80/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+networks:
+  hatch-network:
+    driver: bridge
