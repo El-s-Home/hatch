@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   hatch-web:
     build:
@@ -7,9 +5,10 @@ services:
       dockerfile: Dockerfile
     container_name: hatch-web
     restart: unless-stopped
+    ports:
+      - "8080:80"
     networks:
       - hatch-network
-    # No ports exposed to host - nginx reverse proxies to container
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:80/"]
       interval: 30s
