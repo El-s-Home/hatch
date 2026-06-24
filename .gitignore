@@ -12,6 +12,11 @@ go.work
 /bin
 /dist
 
+# Runtime data
+data/
+*.db
+coverage.out
+
 # IDE
 .idea/
 .vscode/

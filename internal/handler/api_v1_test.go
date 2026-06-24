@@ -8,10 +8,11 @@ import (
 	"testing"
 
 	"github.com/elfoundation/hatch/internal/store"
+	"github.com/elfoundation/hatch/internal/testutil"
 )
 
 func TestV1CaptureRequest(t *testing.T) {
-	repo := newFakeRepo()
+	repo := testutil.NewFakeRepository()
 	r := testRouter(repo)
 
 	body := `{"method":"POST","path":"/test","headers":{"X-Custom":"value"},"query":"foo=bar","body":"hello"}`
@@ -35,16 +36,16 @@ func TestV1CaptureRequest(t *testing.T) {
 		t.Errorf("expected path /test, got %v", resp["path"])
 	}
 	// Verify request stored in repo.
-	if len(repo.requests) != 1 {
-		t.Fatalf("expected 1 request stored, got %d", len(repo.requests))
+	if len(repo.Requests) != 1 {
+		t.Fatalf("expected 1 request stored, got %d", len(repo.Requests))
 	}
-	if repo.requests[0].Headers != `{"X-Custom":"value"}` {
-		t.Errorf("expected headers JSON, got %q", repo.requests[0].Headers)
+	if repo.Requests[0].Headers != `{"X-Custom":"value"}` {
+		t.Errorf("expected headers JSON, got %q", repo.Requests[0].Headers)
 	}
 }
 
 func TestV1ListRequests(t *testing.T) {
-	repo := newFakeRepo()
+	repo := testutil.NewFakeRepository()
 	repo.CreateEndpoint(nil, "list-ep")
 	// Add a few requests.
 	repo.AppendRequest(nil, "list-ep", &store.Request{Method: "GET", Path: "/a"})
@@ -77,7 +78,7 @@ func TestV1ListRequests(t *testing.T) {
 }
 
 func TestV1SearchRequests(t *testing.T) {
-	repo := newFakeRepo()
+	repo := testutil.NewFakeRepository()
 	repo.CreateEndpoint(nil, "search-ep")
 	repo.AppendRequest(nil, "search-ep", &store.Request{Method: "GET", Path: "/users", Headers: `{"Accept":"json"}`})
 	repo.AppendRequest(nil, "search-ep", &store.Request{Method: "POST", Path: "/orders", Body: []byte(`{"item":"apple"}`)})
@@ -111,7 +112,7 @@ func TestV1SearchRequests(t *testing.T) {
 }
 
 func TestV1MockSet(t *testing.T) {
-	repo := newFakeRepo()
+	repo := testutil.NewFakeRepository()
 	repo.CreateEndpoint(nil, "mock-ep")
 	r := testRouter(repo)
 
@@ -138,7 +139,7 @@ func TestV1MockSet(t *testing.T) {
 }
 
 func TestV1OpenAPI(t *testing.T) {
-	repo := newFakeRepo()
+	repo := testutil.NewFakeRepository()
 	r := testRouter(repo)
 	req := httptest.NewRequest(http.MethodGet, "/v1/endpoints/test/openapi.json", nil)
 	w := httptest.NewRecorder()
