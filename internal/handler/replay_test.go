@@ -8,13 +8,14 @@ import (
 	"testing"
 
 	"github.com/elfoundation/hatch/internal/store"
+	"github.com/elfoundation/hatch/internal/testutil"
 )
 
 func TestReplayMissingTargetURL(t *testing.T) {
-	repo := newFakeRepo()
+	repo := testutil.NewFakeRepository()
 	repo.CreateEndpoint(nil, "ep")
 	repo.AppendRequest(nil, "ep", &store.Request{Method: "POST", Path: "/webhook", Headers: "{}"})
-	reqID := repo.requests[0].ID
+	reqID := repo.Requests[0].ID
 
 	r := testRouter(repo)
 	body := `{}`
@@ -34,10 +35,10 @@ func TestReplayMissingTargetURL(t *testing.T) {
 }
 
 func TestReplayInvalidScheme(t *testing.T) {
-	repo := newFakeRepo()
+	repo := testutil.NewFakeRepository()
 	repo.CreateEndpoint(nil, "ep")
 	repo.AppendRequest(nil, "ep", &store.Request{Method: "GET", Path: "/", Headers: "{}"})
-	reqID := repo.requests[0].ID
+	reqID := repo.Requests[0].ID
 
 	r := testRouter(repo)
 	body := `{"target_url": "ftp://bad.scheme/"}`
@@ -52,10 +53,10 @@ func TestReplayInvalidScheme(t *testing.T) {
 }
 
 func TestReplaySSRFBlocksLocalhost(t *testing.T) {
-	repo := newFakeRepo()
+	repo := testutil.NewFakeRepository()
 	repo.CreateEndpoint(nil, "ep")
 	repo.AppendRequest(nil, "ep", &store.Request{Method: "GET", Path: "/", Headers: "{}"})
-	reqID := repo.requests[0].ID
+	reqID := repo.Requests[0].ID
 
 	r := testRouter(repo)
 	body := `{"target_url": "http://localhost:8080/"}`
@@ -70,10 +71,10 @@ func TestReplaySSRFBlocksLocalhost(t *testing.T) {
 }
 
 func TestReplaySSRFBlocksPrivate(t *testing.T) {
-	repo := newFakeRepo()
+	repo := testutil.NewFakeRepository()
 	repo.CreateEndpoint(nil, "ep")
 	repo.AppendRequest(nil, "ep", &store.Request{Method: "GET", Path: "/", Headers: "{}"})
-	reqID := repo.requests[0].ID
+	reqID := repo.Requests[0].ID
 
 	r := testRouter(repo)
 	for _, addr := range []string{
@@ -96,7 +97,7 @@ func TestReplaySSRFBlocksPrivate(t *testing.T) {
 }
 
 func TestReplayNotFound(t *testing.T) {
-	repo := newFakeRepo()
+	repo := testutil.NewFakeRepository()
 	r := testRouter(repo)
 	body := `{"target_url": "https://example.com/"}`
 	req := httptest.NewRequest(http.MethodPost, "/e/ep/requests/nonexistent/replay", strings.NewReader(body))
@@ -118,7 +119,7 @@ func TestReplaySuccess(t *testing.T) {
 	}))
 	defer sink.Close()
 
-	repo := newFakeRepo()
+	repo := testutil.NewFakeRepository()
 	repo.CreateEndpoint(nil, "ep")
 	repo.AppendRequest(nil, "ep", &store.Request{
 		Method:  "POST",
@@ -127,7 +128,7 @@ func TestReplaySuccess(t *testing.T) {
 		Query:   "foo=bar",
 		Body:    []byte(`{"msg":"hello"}`),
 	})
-	reqID := repo.requests[0].ID
+	reqID := repo.Requests[0].ID
 
 	// Set env to allow private replay since httptest server is on loopback.
 	t.Setenv("HATCH_ALLOW_PRIVATE_REPLAY", "true")
@@ -175,7 +176,7 @@ func TestReplayE2ECaptureThenReplay(t *testing.T) {
 	defer sink.Close()
 
 	// Step 2: Capture a request.
-	repo := newFakeRepo()
+	repo := testutil.NewFakeRepository()
 	rt := testRouter(repo)
 
 	captureReq := httptest.NewRequest("POST", "/e2e-test", strings.NewReader(`{"order":"1"}`))
@@ -183,10 +184,10 @@ func TestReplayE2ECaptureThenReplay(t *testing.T) {
 	captureW := httptest.NewRecorder()
 	rt.ServeHTTP(captureW, captureReq)
 
-	if len(repo.requests) != 1 {
-		t.Fatalf("expected 1 captured request, got %d", len(repo.requests))
+	if len(repo.Requests) != 1 {
+		t.Fatalf("expected 1 captured request, got %d", len(repo.Requests))
 	}
-	captured := repo.requests[0]
+	captured := repo.Requests[0]
 	if captured.Method != "POST" {
 		t.Errorf("captured method: %s", captured.Method)
 	}

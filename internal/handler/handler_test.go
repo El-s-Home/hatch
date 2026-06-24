@@ -11,89 +11,10 @@ import (
 	"time"
 
 	"github.com/elfoundation/hatch/internal/store"
+	"github.com/elfoundation/hatch/internal/testutil"
 	"github.com/go-chi/chi/v5"
 )
 
-// fakeRepo implements store.Repository for tests.
-type fakeRepo struct {
-	endpoints map[string]*store.Endpoint
-	requests  []*store.Request
-	mocks     map[string]*store.MockConfig
-}
-
-func newFakeRepo() *fakeRepo {
-	return &fakeRepo{
-		endpoints: map[string]*store.Endpoint{},
-		mocks:     map[string]*store.MockConfig{},
-	}
-}
-
-func (f *fakeRepo) CreateEndpoint(_ context.Context, u string) (*store.Endpoint, error) {
-	e := &store.Endpoint{ID: u, URL: u, CreatedAt: "t", UpdatedAt: "t"}
-	f.endpoints[u] = e
-	return e, nil
-}
-func (f *fakeRepo) GetEndpoint(_ context.Context, id string) (*store.Endpoint, error) {
-	e, ok := f.endpoints[id]
-	if !ok {
-		return nil, errNotFound
-	}
-	return e, nil
-}
-func (f *fakeRepo) AppendRequest(_ context.Context, eid string, r *store.Request) error {
-	r.ID = "req-" + string(rune(len(f.requests)+'0'))
-	r.EndpointID = eid
-	f.requests = append(f.requests, r)
-	return nil
-}
-func (f *fakeRepo) GetRequest(_ context.Context, id string) (*store.Request, error) {
-	for _, r := range f.requests {
-		if r.ID == id {
-			return r, nil
-		}
-	}
-	return nil, errNotFound
-}
-func (f *fakeRepo) ListRequests(_ context.Context, _ string, _ int) ([]*store.Request, error) {
-	return f.requests, nil
-}
-func (f *fakeRepo) SearchRequests(_ context.Context, _ string, query string, limit int) ([]*store.Request, error) {
-	if query == "" {
-		return f.requests, nil
-	}
-	var matched []*store.Request
-	for _, r := range f.requests {
-		if strings.Contains(r.Method, query) ||
-			strings.Contains(r.Path, query) ||
-			strings.Contains(r.Headers, query) ||
-			strings.Contains(r.Query, query) ||
-			strings.Contains(string(r.Body), query) {
-			matched = append(matched, r)
-			if limit > 0 && len(matched) >= limit {
-				break
-			}
-		}
-	}
-	return matched, nil
-}
-func (f *fakeRepo) GetMock(_ context.Context, endpointID string) (*store.MockConfig, error) {
-	m, ok := f.mocks[endpointID]
-	if !ok {
-		return nil, errNotFound
-	}
-	return m, nil
-}
-func (f *fakeRepo) SetMock(_ context.Context, mock *store.MockConfig) error {
-	f.mocks[mock.EndpointID] = mock
-	return nil
-}
-func (f *fakeRepo) Close() error { return nil }
-
-var errNotFound = &se{"nf"}
-
-type se struct{ m string }
-
-func (e *se) Error() string { return e.m }
 
 // testRouter creates a chi router with all routes registered using a fake repo.
 func testRouter(repo store.Repository) chi.Router {
@@ -104,7 +25,7 @@ func testRouter(repo store.Repository) chi.Router {
 }
 
 func TestHealthz(t *testing.T) {
-	r := testRouter(newFakeRepo())
+	r := testRouter(testutil.NewFakeRepository())
 	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
@@ -121,7 +42,7 @@ func TestHealthz(t *testing.T) {
 func TestCaptureRecordsAllVerbs(t *testing.T) {
 	methods := []string{"GET", "POST", "PUT", "PATCH", "DELETE"}
 	for _, m := range methods {
-		repo := newFakeRepo()
+		repo := testutil.NewFakeRepository()
 		r := testRouter(repo)
 
 		body := ""
@@ -138,11 +59,11 @@ func TestCaptureRecordsAllVerbs(t *testing.T) {
 		if w.Code != 200 {
 			t.Errorf("%s: expected 200, got %d", m, w.Code)
 		}
-		if len(repo.requests) != 1 {
-			t.Errorf("%s: expected 1 request, got %d", m, len(repo.requests))
+		if len(repo.Requests) != 1 {
+			t.Errorf("%s: expected 1 request, got %d", m, len(repo.Requests))
 			continue
 		}
-		reqCaptured := repo.requests[0]
+		reqCaptured := repo.Requests[0]
 		if reqCaptured.Method != m {
 			t.Errorf("%s: wrong method %s", m, reqCaptured.Method)
 		}
@@ -150,7 +71,7 @@ func TestCaptureRecordsAllVerbs(t *testing.T) {
 }
 
 func TestSSEStreamReceivesEventOnCapture(t *testing.T) {
-	repo := newFakeRepo()
+	repo := testutil.NewFakeRepository()
 	srv := httptest.NewServer(testRouter(repo))
 	defer srv.Close()
 
@@ -224,7 +145,7 @@ func TestSSEStreamReceivesEventOnCapture(t *testing.T) {
 }
 
 func TestInspectReturnsHTML(t *testing.T) {
-	repo := newFakeRepo()
+	repo := testutil.NewFakeRepository()
 	repo.CreateEndpoint(nil, "ep")
 	repo.AppendRequest(nil, "ep", &store.Request{
 		Method:  "POST",
@@ -290,7 +211,7 @@ func TestInspectReturnsHTML(t *testing.T) {
 }
 
 func TestInspectEmptyState(t *testing.T) {
-	repo := newFakeRepo()
+	repo := testutil.NewFakeRepository()
 	repo.CreateEndpoint(nil, "new-ep")
 
 	r := testRouter(repo)
@@ -320,7 +241,7 @@ func TestInspectEmptyState(t *testing.T) {
 }
 
 func TestInspectAutoCreatesEndpoint(t *testing.T) {
-	repo := newFakeRepo()
+	repo := testutil.NewFakeRepository()
 
 	// The endpoint doesn't exist yet.
 	r := testRouter(repo)
@@ -350,7 +271,7 @@ func TestInspectAutoCreatesEndpoint(t *testing.T) {
 }
 
 func TestCaptureReturnsJSON200(t *testing.T) {
-	r := testRouter(newFakeRepo())
+	r := testRouter(testutil.NewFakeRepository())
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, httptest.NewRequest("GET", "/t", nil))
 
@@ -369,7 +290,7 @@ func TestCaptureReturnsJSON200(t *testing.T) {
 }
 
 func TestMockSetsAndConfiguresResponse(t *testing.T) {
-	repo := newFakeRepo()
+	repo := testutil.NewFakeRepository()
 	repo.CreateEndpoint(nil, "mock-ep")
 
 	r := testRouter(repo)
@@ -399,7 +320,7 @@ func TestMockSetsAndConfiguresResponse(t *testing.T) {
 }
 
 func TestMockReturnsConfiguredResponseOnCapture(t *testing.T) {
-	repo := newFakeRepo()
+	repo := testutil.NewFakeRepository()
 	repo.CreateEndpoint(nil, "mock-cap")
 	// Pre-set a mock.
 	repo.SetMock(nil, &store.MockConfig{
@@ -427,16 +348,16 @@ func TestMockReturnsConfiguredResponseOnCapture(t *testing.T) {
 	}
 
 	// Request should still be captured even when mock responds.
-	if len(repo.requests) != 1 {
-		t.Fatalf("expected 1 captured request, got %d", len(repo.requests))
+	if len(repo.Requests) != 1 {
+		t.Fatalf("expected 1 captured request, got %d", len(repo.Requests))
 	}
-	if repo.requests[0].Method != "POST" {
-		t.Errorf("captured method: %s", repo.requests[0].Method)
+	if repo.Requests[0].Method != "POST" {
+		t.Errorf("captured method: %s", repo.Requests[0].Method)
 	}
 }
 
 func TestMockAutoCreatesEndpointOnSet(t *testing.T) {
-	repo := newFakeRepo()
+	repo := testutil.NewFakeRepository()
 	r := testRouter(repo)
 
 	// Set a mock on an endpoint that doesn't exist yet.
