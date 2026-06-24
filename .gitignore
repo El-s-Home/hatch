@@ -11,6 +11,7 @@ go.work
 # Build
 /bin
 /dist
+/data
 
 # Runtime data
 data/
