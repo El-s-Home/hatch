@@ -5,11 +5,11 @@ import CTA from '@/components/CTA'
 
 export default function Home() {
   return (
-    <main className="relative z-10">
+    <>
       <Hero />
       <Features />
       <Why />
       <CTA />
-    </main>
+    </>
   )
 }

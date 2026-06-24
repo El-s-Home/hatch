@@ -8,6 +8,7 @@ const features = [
     ),
     title: 'Capture',
     description: 'Method, path, headers, query, body. Persists across restarts because the storage is SQLite on disk, not a hosted queue.',
+    color: 'blue',
   },
   {
     icon: (
@@ -18,6 +19,7 @@ const features = [
     ),
     title: 'Inspect',
     description: 'A live SSE feed of incoming requests. Click any captured request to see the headers, the body, the timing.',
+    color: 'purple',
   },
   {
     icon: (
@@ -28,8 +30,24 @@ const features = [
     ),
     title: 'Mock',
     description: 'Return a 200, a 500, or a custom JSON payload. For testing your own retry, backoff, and error-handling logic.',
+    color: 'cyan',
   },
 ]
+
+const colorClasses = {
+  blue: {
+    icon: 'bg-blue-500/15 text-blue-400',
+    hover: 'hover:border-blue-500/40 hover:shadow-blue-500/10',
+  },
+  purple: {
+    icon: 'bg-purple-500/15 text-purple-400',
+    hover: 'hover:border-purple-500/40 hover:shadow-purple-500/10',
+  },
+  cyan: {
+    icon: 'bg-cyan-500/15 text-cyan-400',
+    hover: 'hover:border-cyan-500/40 hover:shadow-cyan-500/10',
+  },
+}
 
 export default function Features() {
   return (
@@ -40,20 +58,23 @@ export default function Features() {
         </h2>
         
         <div className="grid md:grid-cols-3 gap-8">
-          {features.map((feature, index) => (
-            <div
-              key={feature.title}
-              className="p-6 rounded-xl bg-zinc-900/50 border border-zinc-800 hover:border-zinc-700 transition-colors"
-            >
-              <div className="w-12 h-12 flex items-center justify-center rounded-lg bg-blue-500/10 text-blue-400 mb-4">
-                {feature.icon}
+          {features.map((feature) => {
+            const colors = colorClasses[feature.color as keyof typeof colorClasses]
+            return (
+              <div
+                key={feature.title}
+                className={`p-6 rounded-xl bg-gradient-to-b from-zinc-900/80 to-zinc-900/40 border border-zinc-800 ${colors.hover} transition-all hover:-translate-y-1 shadow-lg hover:shadow-xl`}
+              >
+                <div className={`w-14 h-14 flex items-center justify-center rounded-xl ${colors.icon} mb-4 shadow-lg`}>
+                  {feature.icon}
+                </div>
+                <h3 className="text-xl font-semibold mb-2">{feature.title}</h3>
+                <p className="text-zinc-400 leading-relaxed">
+                  {feature.description}
+                </p>
               </div>
-              <h3 className="text-xl font-semibold mb-2">{feature.title}</h3>
-              <p className="text-zinc-400 leading-relaxed">
-                {feature.description}
-              </p>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
     </section>

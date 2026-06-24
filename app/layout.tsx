@@ -50,8 +50,13 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
       <body className="min-h-screen bg-zinc-950 text-white font-sans antialiased">
+        <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-blue-500 focus:text-white focus:rounded-lg">
+          Skip to content
+        </a>
         <Header />
-        {children}
+        <main id="main-content" role="main">
+          {children}
+        </main>
         <Footer />
       </body>
     </html>
