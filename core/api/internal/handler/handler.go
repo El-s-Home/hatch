@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/elfoundation/hatch/internal/store"
+	"github.com/elfoundation/hatch/internal/web"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
@@ -46,8 +47,13 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 	// JSON API v1 routes.
 	h.RegisterV1Routes(r)
 
-	// Inspect page: server-rendered request list.
-	r.Get("/e/{endpointID}", HandleInspect(h.Repo))
+	// SPA static assets (hashed files under /assets/*).
+	r.Handle("/assets/*", web.AssetsHandler())
+
+	// SPA shell: the inspect dashboard. The client renders everything from
+	// the JSON API + SSE; "/" and "/e/{id}" both serve the same app.
+	r.Get("/", HandleInspect())
+	r.Get("/e/{endpointID}", HandleInspect())
 
 	// SSE stream for live updates.
 	r.Get("/e/{endpointID}/events", HandleSSE(h.Repo))

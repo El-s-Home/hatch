@@ -143,15 +143,16 @@ func TestSSEStreamReceivesEventOnCapture(t *testing.T) {
 	cancel()
 }
 
-func TestInspectReturnsHTML(t *testing.T) {
+// The inspect route now serves a static SPA shell; all request rendering
+// happens client-side from the JSON API + SSE. So the shell is identical
+// regardless of endpoint state — we just assert it's the app document.
+func TestInspectServesSPAShell(t *testing.T) {
 	repo := testutil.NewFakeRepository()
 	repo.CreateEndpoint(nil, "ep")
 	repo.AppendRequest(nil, "ep", &store.Request{
-		Method:  "POST",
-		Path:    "/ep/webhook",
-		Headers: `{"Content-Type":"application/json"}`,
-		Query:   "foo=bar",
-		Body:    []byte(`{"msg":"hello"}`),
+		Method: "POST",
+		Path:   "/ep/webhook",
+		Body:   []byte(`{"msg":"hello"}`),
 	})
 
 	r := testRouter(repo)
@@ -168,104 +169,34 @@ func TestInspectReturnsHTML(t *testing.T) {
 
 	body := w.Body.String()
 
-	// Should contain the endpoint ID.
-	if !strings.Contains(body, "ep") {
-		t.Error("missing endpoint ID in HTML")
+	// The SPA shell mounts at #root and loads its bundle from /assets/.
+	if !strings.Contains(body, `id="root"`) {
+		t.Error("missing SPA mount point in shell")
 	}
-
-	// Should contain the request method badge.
-	if !strings.Contains(body, "POST") {
-		t.Error("missing POST method in HTML")
-	}
-
-	// Should contain the request path.
-	if !strings.Contains(body, "/ep/webhook") {
-		t.Error("missing request path in HTML")
-	}
-
-	// Should contain the header JSON.
-	if !strings.Contains(body, "Content-Type") {
-		t.Error("missing Content-Type header in HTML")
-	}
-
-	// Should contain the query string.
-	if !strings.Contains(body, "foo=bar") {
-		t.Error("missing query string in HTML")
-	}
-
-	// Should contain the body content (html/template escapes quotes).
-	if !strings.Contains(body, "msg") || !strings.Contains(body, "hello") {
-		t.Error("missing request body content in HTML")
-	}
-
-	// Should contain the replay button.
-	if !strings.Contains(body, "Replay") {
-		t.Error("missing Replay button in HTML")
-	}
-
-	// Should contain SSE EventSource script.
-	if !strings.Contains(body, "EventSource") {
-		t.Error("missing EventSource in HTML")
+	if !strings.Contains(body, "/assets/") {
+		t.Error("missing hashed asset reference in shell")
 	}
 }
 
-func TestInspectEmptyState(t *testing.T) {
+// Endpoint auto-creation is now the API's responsibility (the SPA calls the
+// JSON list endpoint on load), not the static page's.
+func TestListAutoCreatesEndpoint(t *testing.T) {
 	repo := testutil.NewFakeRepository()
-	repo.CreateEndpoint(nil, "new-ep")
 
 	r := testRouter(repo)
 	w := httptest.NewRecorder()
-	r.ServeHTTP(w, httptest.NewRequest("GET", "/e/new-ep", nil))
+	r.ServeHTTP(w, httptest.NewRequest("GET", "/v1/endpoints/auto-ep/requests", nil))
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
 
-	body := w.Body.String()
-
-	// Should show the "waiting for requests" empty state.
-	if !strings.Contains(body, "Waiting for requests") {
-		t.Error("missing empty state message")
-	}
-
-	// Should show the usage hint with the endpoint ID.
-	if !strings.Contains(body, "/new-ep") {
-		t.Error("missing usage hint with endpoint ID")
-	}
-
-	// No request cards should be rendered.
-	if strings.Contains(body, `class="request"`) {
-		t.Error("unexpected request card in empty state")
-	}
-}
-
-func TestInspectAutoCreatesEndpoint(t *testing.T) {
-	repo := testutil.NewFakeRepository()
-
-	// The endpoint doesn't exist yet.
-	r := testRouter(repo)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, httptest.NewRequest("GET", "/e/auto-ep", nil))
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", w.Code)
-	}
-
-	// The endpoint should now exist in the repo.
 	ep, err := repo.GetEndpoint(nil, "auto-ep")
 	if err != nil {
 		t.Fatalf("endpoint was not auto-created: %v", err)
 	}
 	if ep.ID != "auto-ep" {
 		t.Errorf("expected endpoint ID 'auto-ep', got %q", ep.ID)
-	}
-
-	body := w.Body.String()
-	if !strings.Contains(body, "auto-ep") {
-		t.Error("missing endpoint ID in auto-created page")
-	}
-	if !strings.Contains(body, "Waiting for requests") {
-		t.Error("missing empty state for auto-created endpoint")
 	}
 }
 
@@ -380,18 +311,20 @@ func TestMockAutoCreatesEndpointOnSet(t *testing.T) {
 	}
 }
 
-func TestCaptureMissingEndpointID(t *testing.T) {
+func TestRootServesSPAShell(t *testing.T) {
 	repo := testutil.NewFakeRepository()
 	r := testRouter(repo)
 
-	// Request to root path - chi router returns 404 since /{endpointID} doesn't match.
+	// Root now serves the SPA home (no longer a capture target).
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 
-	// Chi returns 404 for unmatched routes.
-	if w.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d", w.Code)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), `id="root"`) {
+		t.Error("missing SPA mount point at root")
 	}
 }
 
@@ -420,44 +353,6 @@ func TestV1ListRequestsMissingEndpoint(t *testing.T) {
 
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", w.Code)
-	}
-}
-
-func TestPrettyJSON(t *testing.T) {
-	// Valid JSON.
-	input := `{"key":"value","num":42}`
-	result := prettyJSON(input)
-	if !strings.Contains(result, "key") || !strings.Contains(result, "value") {
-		t.Errorf("prettyJSON should contain key-value pairs: %s", result)
-	}
-
-	// Invalid JSON (returns raw string).
-	invalid := `not json`
-	result = prettyJSON(invalid)
-	if result != invalid {
-		t.Errorf("prettyJSON should return raw string for invalid JSON: %s", result)
-	}
-}
-
-func TestFormatTime(t *testing.T) {
-	// Recent timestamp (should show relative time).
-	now := time.Now().UTC().Format("2006-01-02T15:04:05.000Z07:00")
-	result := formatTime(now)
-	if result != "just now" {
-		t.Errorf("expected 'just now', got %q", result)
-	}
-
-	// Older timestamp.
-	old := time.Now().Add(-2 * time.Hour).UTC().Format("2006-01-02T15:04:05.000Z07:00")
-	result = formatTime(old)
-	if !strings.Contains(result, "h ago") {
-		t.Errorf("expected relative time with 'h ago', got %q", result)
-	}
-
-	// Invalid format (returns raw string).
-	result = formatTime("invalid")
-	if result != "invalid" {
-		t.Errorf("expected raw string for invalid format, got %q", result)
 	}
 }
 
@@ -498,19 +393,3 @@ func TestHandleMockReturnsErrorOnInvalidJSON(t *testing.T) {
 	}
 }
 
-func TestInspectReturnsHTMLErrorOnRepoFailure(t *testing.T) {
-	// Test that the inspect page works with a valid endpoint ID.
-	r := testRouter(testutil.NewFakeRepository())
-	req := httptest.NewRequest(http.MethodGet, "/e/test-ep", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-
-	// Should return 200 and auto-create the endpoint.
-	if w.Code != http.StatusOK {
-		t.Errorf("expected 200, got %d", w.Code)
-	}
-	body := w.Body.String()
-	if !strings.Contains(body, "test-ep") {
-		t.Error("missing endpoint ID in HTML")
-	}
-}

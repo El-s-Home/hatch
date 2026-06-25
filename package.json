@@ -1,0 +1,9 @@
+{
+  "name": "hatch-monorepo",
+  "private": true,
+  "packageManager": "pnpm@9.15.9",
+  "scripts": {
+    "dev": "pnpm --filter @hatch/core-web dev",
+    "build:web": "pnpm --filter @hatch/core-web build"
+  }
+}

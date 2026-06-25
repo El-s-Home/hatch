@@ -1,0 +1,10 @@
+@import "tailwindcss";
+
+/* The inspector UI lives in a workspace package (symlinked under node_modules),
+   which Tailwind's auto-detection skips. Register it explicitly so its classes
+   are generated. */
+@source "../../../packages/inspector-ui/src/**/*.{ts,tsx}";
+
+html {
+  background: #09090b;
+}

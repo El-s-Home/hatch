@@ -179,41 +179,16 @@ func TestSmokeE2E(t *testing.T) {
 		body, _ := io.ReadAll(resp.Body)
 		html := string(body)
 
-		// Page structure.
-		if !strings.Contains(html, "<!DOCTYPE html>") {
+		// The inspect route serves the SPA shell; request rendering is
+		// client-side from the JSON API + SSE.
+		if !strings.Contains(html, "<!doctype html>") && !strings.Contains(html, "<!DOCTYPE html>") {
 			t.Error("missing doctype")
 		}
-		if !strings.Contains(html, "capture-test") {
-			t.Error("missing endpoint ID")
+		if !strings.Contains(html, `id="root"`) {
+			t.Error("missing SPA mount point")
 		}
-
-		// Request cards.
-		if !strings.Contains(html, "DELETE") {
-			t.Error("missing DELETE method badge")
-		}
-		if !strings.Contains(html, "POST") {
-			t.Error("missing POST method badge")
-		}
-
-		// Replay UI.
-		if !strings.Contains(html, "Replay") {
-			t.Error("missing Replay button")
-		}
-
-		// SSE live-update script.
-		if !strings.Contains(html, "EventSource") {
-			t.Error("missing EventSource script")
-		}
-
-		// Empty-state endpoint should show the hint.
-		resp2, err := client.Get(srv.URL + "/e/nonexistent")
-		if err != nil {
-			t.Fatalf("GET /e/nonexistent: %v", err)
-		}
-		defer resp2.Body.Close()
-		body2, _ := io.ReadAll(resp2.Body)
-		if !strings.Contains(string(body2), "Waiting for requests") {
-			t.Error("missing empty state for unused endpoint")
+		if !strings.Contains(html, "/assets/") {
+			t.Error("missing hashed asset reference")
 		}
 	})
 
@@ -601,16 +576,15 @@ func TestErrorHandling(t *testing.T) {
 		}
 	})
 
-	// Test missing endpoint ID (root path).
-	t.Run("missing_endpoint", func(t *testing.T) {
+	// Root path now serves the SPA home.
+	t.Run("root_serves_spa", func(t *testing.T) {
 		resp, err := client.Get(srv.URL + "/")
 		if err != nil {
 			t.Fatalf("GET /: %v", err)
 		}
 		resp.Body.Close()
-		// Chi returns 404 for unmatched routes.
-		if resp.StatusCode != http.StatusNotFound {
-			t.Fatalf("expected 404, got %d", resp.StatusCode)
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("expected 200, got %d", resp.StatusCode)
 		}
 	})
 
